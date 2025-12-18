@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>經典打磚塊 (Breakout)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding-top: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        #gameCanvas {
+            background: #eee;
+            border: 5px solid #333;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            cursor: none; /* 隱藏滑鼠游標，讓擋板移動更專注 */
+        }
+
+        .controls, .status {
+            margin-top: 15px;
+            font-size: 1.1em;
+            color: #555;
+            text-align: center;
+        }
+
+        .status {
+            font-weight: bold;
+            color: #d63031;
+            min-height: 25px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🧱 經典打磚塊遊戲</h1>
+    <div class="controls">
+        使用 **滑鼠** 或 **← → 方向鍵** 移動擋板
+    </div>
+
+    <canvas id="gameCanvas" width="480" height="320"></canvas>
+    
+    <div class="status"></div>
+
+    <script>
+        // 獲取 Canvas 元素和繪圖上下文
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const statusDiv = document.querySelector(".status");
+
+        // --- 遊戲參數設定 ---
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
+        let gameLoop;
+        let lives = 3;
+        let score = 0;
+        let isGameStarted = false;
+        let isGameOver = false;
+
+        // 球體 (Ball) 參數
+        let x = WIDTH / 2;
+        let y = HEIGHT - 30;
+        let dx = 2; // X軸移動速度
+        let dy = -2; // Y軸移動速度
+        const ballRadius = 10;
+
+        // 擋板 (Paddle) 參數
+        const paddleHeight = 10;
+        const paddleWidth = 75;
+        let paddleX = (WIDTH - paddleWidth) / 2;
+        const paddleSpeed = 7;
+        let rightPressed = false;
+        let leftPressed = false;
+
+        // 磚塊 (Bricks) 參數
+        const brickRowCount = 5;
+        const brickColumnCount = 8;
+        const brickWidth = 50;
+        const brickHeight = 15;
+        const brickPadding = 5;
+        const brickOffsetTop = 30;
+        const brickOffsetLeft = 15;
+
+        // 建立二維陣列儲存磚塊狀態 (c: column, r: row)
+        let bricks = [];
+        for (let c = 0; c < brickColumnCount; c++) {
+            bricks[c] = [];
+            for (let r = 0; r < brickRowCount; r++) {
+                // 每個磚塊物件有一個 x, y 座標和狀態 status (1表示存在, 0表示被擊碎)
+                bricks[c][r] = { x: 0, y: 0, status: 1 };
+            }
+        }
+
+        // --- 事件監聽 ---
+        document.addEventListener("keydown", keyDownHandler, false);
+        document.addEventListener("keyup", keyUpHandler, false);
+        document.addEventListener("mousemove", mouseMoveHandler, false);
+        canvas.addEventListener("click", startGame, false); // 點擊 Canvas 開始遊戲
+
+        function keyDownHandler(e) {
+            if (e.key === "Right" || e.key === "ArrowRight") {
+                rightPressed = true;
+            } else if (e.key === "Left" || e.key === "ArrowLeft") {
+                leftPressed = true;
+            }
+        }
+
+        function keyUpHandler(e) {
+            if (e.key === "Right" || e.key === "ArrowRight") {
+                rightPressed = false;
+            } else if (e.key === "Left" || e.key === "ArrowLeft") {
+                leftPressed = false;
+            }
+        }
+
+        function mouseMoveHandler(e) {
+            const relativeX = e.clientX - canvas.offsetLeft;
+            // 限制擋板的移動範圍在 Canvas 內
+            if (relativeX > paddleWidth / 2 && relativeX < WIDTH - paddleWidth / 2) {
+                paddleX = relativeX - paddleWidth / 2;
+            }
+            if (!isGameStarted && !isGameOver) {
+                // 如果遊戲還沒開始，點擊滑鼠開始遊戲
+                statusDiv.innerHTML = "點擊滑鼠或任意鍵開始遊戲!";
+            }
+        }
+        
+        // --- 繪製函式 ---
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+            ctx.fillStyle = "#FF4500"; // 球體顏色
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawPaddle() {
+            ctx.beginPath();
+            ctx.rect(paddleX, HEIGHT - paddleHeight, paddleWidth, paddleHeight);
+            ctx.fillStyle = "#0095DD"; // 擋板顏色
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawBricks() {
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    const b = bricks[c][r];
+                    if (b.status === 1) {
+                        // 計算磚塊位置
+                        b.x = (c * (brickWidth + brickPadding)) + brickOffsetLeft;
+                        b.y = (r * (brickHeight + brickPadding)) + brickOffsetTop;
+                        
+                        ctx.beginPath();
+                        ctx.rect(b.x, b.y, brickWidth, brickHeight);
+                        // 根據行數給予不同顏色
+                        ctx.fillStyle = getBrickColor(r); 
+                        ctx.fill();
+                        ctx.closePath();
+                    }
+                }
+            }
+        }
+
+        function getBrickColor(row) {
+            const colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA502", "#A29BFE"];
+            return colors[row % colors.length];
+        }
+
+        function drawScore() {
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#333";
+            ctx.fillText(`分數: ${score}`, 8, 20);
+        }
+
+        function drawLives() {
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#333";
+            ctx.fillText(`生命: ${lives}`, WIDTH - 65, 20);
+        }
+
+        // --- 碰撞檢測與遊戲邏輯 ---
+
+        function collisionDetection() {
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    const b = bricks[c][r];
+                    if (b.status === 1) {
+                        // 判斷球是否在磚塊範圍內
+                        if (x + ballRadius > b.x && x - ballRadius < b.x + brickWidth && 
+                            y + ballRadius > b.y && y - ballRadius < b.y + brickHeight) {
+                            
+                            dy = -dy; // 球體反彈
+                            b.status = 0; // 磚塊被擊碎
+                            score++; // 增加分數
+
+                            // 檢查是否所有磚塊都被擊碎
+                            if (score === brickRowCount * brickColumnCount) {
+                                winGame();
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function winGame() {
+            statusDiv.innerHTML = "🏆 恭喜你！清除所有磚塊！點擊重新開始。";
+            clearInterval(gameLoop);
+            isGameOver = true;
+        }
+
+        function loseGame() {
+            statusDiv.innerHTML = "💀 遊戲結束！點擊重新開始。";
+            clearInterval(gameLoop);
+            isGameOver = true;
+        }
+
+        function resetGame() {
+            // 重設所有參數
+            lives = 3;
+            score = 0;
+            isGameStarted = false;
+            isGameOver = false;
+
+            // 重設球的位置和方向
+            x = WIDTH / 2;
+            y = HEIGHT - 30;
+            dx = 2;
+            dy = -2;
+            paddleX = (WIDTH - paddleWidth) / 2;
+
+            // 重設所有磚塊狀態
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    bricks[c][r].status = 1;
+                }
+            }
+            
+            // 清除上次的繪圖
+            ctx.clearRect(0, 0, WIDTH, HEIGHT);
+            drawBricks();
+            drawPaddle();
+            drawScore();
+            drawLives();
+            statusDiv.innerHTML = "點擊畫面任意處開始遊戲...";
+        }
+
+        function startGame() {
+            if (!isGameStarted && !isGameOver) {
+                isGameStarted = true;
+                // 開始遊戲循環
+                gameLoop = setInterval(draw, 10); // 每 10 毫秒執行一次 draw
+            } else if (isGameOver) {
+                // 遊戲結束時點擊則重新開始
+                resetGame();
+            }
+        }
+
+
+        // --- 主繪圖函式 (遊戲循環) ---
+
+        function draw() {
+            // 1. 清除上一個畫面
+            ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+            // 2. 繪製元素
+            drawBricks();
+            drawBall();
+            drawPaddle();
+            drawScore();
+            drawLives();
+            collisionDetection();
+
+            // 3. 球體移動與邊界碰撞檢測
+            
+            // 左右牆壁碰撞
+            if (x + dx > WIDTH - ballRadius || x + dx < ballRadius) {
+                dx = -dx;
+            }
+
+            // 上方牆壁碰撞
+            if (y + dy < ballRadius) {
+                dy = -dy;
+            } 
+            
+            // 下方邊界 (落空/生命值邏輯)
+            else if (y + dy > HEIGHT - ballRadius) {
+                // 球是否擊中擋板
+                if (x > paddleX && x < paddleX + paddleWidth) {
+                    dy = -dy; // 反彈
+                    
+                    // 根據擊中擋板的位置微調球的水平方向
+                    const hitPoint = x - (paddleX + paddleWidth / 2); // 擊中點相對於擋板中心的偏移
+                    dx = hitPoint * 0.15; // 調整水平速度（0.15是微調係數）
+
+                } else {
+                    // 沒接到球
+                    lives--;
+                    if (!lives) {
+                        loseGame();
+                        return; // 結束 draw 函式
+                    } else {
+                        // 失去一條生命，重置球和擋板位置
+                        x = WIDTH / 2;
+                        y = HEIGHT - 30;
+                        dx = 2;
+                        dy = -2;
+                        paddleX = (WIDTH - paddleWidth) / 2;
+                        isGameStarted = false;
+                        clearInterval(gameLoop);
+                        statusDiv.innerHTML = "失去一條生命，點擊畫面繼續...";
+                    }
+                }
+            }
+
+            // 4. 擋板移動
+            if (rightPressed && paddleX < WIDTH - paddleWidth) {
+                paddleX += paddleSpeed;
+            } else if (leftPressed && paddleX > 0) {
+                paddleX -= paddleSpeed;
+            }
+            
+            // 5. 更新球的位置
+            x += dx;
+            y += dy;
+        }
+
+        // 頁面載入時，先初始化並繪製一次靜態畫面
+        window.onload = resetGame;
+        
+    </script>
+</body>
+</html>

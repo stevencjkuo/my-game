@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>幸運大輪盤 - 擴充版</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 40px;
+            justify-content: center;
+            align-items: flex-start;
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        /* 左側控制區 */
+        .controls {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 180px; /* 增加高度以便輸入更多選項 */
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            resize: vertical;
+            font-size: 16px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.1s, opacity 0.2s;
+            flex: 1;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        #spinBtn {
+            background-color: #ff4757;
+            color: white;
+            font-size: 18px;
+        }
+
+        #updateBtn {
+            background-color: #2ed573;
+            color: white;
+        }
+
+        /* 右側輪盤區 */
+        .wheel-container {
+            position: relative;
+            width: 400px;
+            height: 400px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99); /* 轉動動畫 */
+        }
+
+        /* 指針 */
+        .pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 50px;
+            background-color: #333;
+            clip-path: polygon(100% 0, 50% 100%, 0 0);
+            z-index: 10;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #2f3542;
+            height: 30px;
+            text-align: center;
+        }
+
+        /* 手機版響應式調整 */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column-reverse;
+                align-items: center;
+            }
+            .wheel-container {
+                width: 300px;
+                height: 300px;
+            }
+            .controls {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎡 幸運大輪盤</h1>
+
+    <div class="container">
+        <div class="controls">
+            <label for="options">輸入選項 (一行一個，可輸入超過 20 個!):</label>
+            <textarea id="options">選項 1: 滷肉飯
+選項 2: 牛肉麵
+選項 3: 麥當勞
+選項 4: 壽司
+選項 5: 水餃
+選項 6: 減肥沙拉
+選項 7: 火鍋
+選項 8: 咖哩飯
+選項 9: 義大利麵
+選項 10: 披薩
+選項 11: 鐵板燒
+選項 12: 越南河粉</textarea>
+            
+            <div class="btn-group">
+                <button id="updateBtn" onclick="initWheel()">重繪輪盤</button>
+            </div>
+            <button id="spinBtn" onclick="spinWheel()">開始旋轉！</button>
+            
+            <div id="result">準備抽籤...</div>
+        </div>
+
+        <div class="wheel-container">
+            <div class="pointer"></div>
+            <canvas id="wheelCanvas" width="500" height="500"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const spinBtn = document.getElementById('spinBtn');
+        const resultDiv = document.getElementById('result');
+        const textarea = document.getElementById('options');
+
+        let options = [];
+        let currentRotation = 0;
+        let isSpinning = false;
+        
+        // **重要更新**：擴充顏色方案至 24 種，確保多選項時顏色不重複！
+        const colors = [
+            '#FF6347', '#3CB371', '#4682B4', '#FFA07A', '#9370DB', '#FFD700', 
+            '#20B2AA', '#F08080', '#B0C4DE', '#ADFF2F', '#FF1493', '#7FFFD4',
+            '#8A2BE2', '#D2691E', '#FF4500', '#00BFFF', '#98FB98', '#FF69B4',
+            '#FFC0CB', '#DAA520', '#1E90FF', '#7CFC00', '#B8860B', '#32CD32'
+        ];
+
+        // 初始化
+        function initWheel() {
+            // 從輸入框讀取資料，過濾空行
+            options = textarea.value.split('\n').filter(opt => opt.trim() !== '');
+            
+            if (options.length === 0) {
+                alert("請至少輸入一個選項！");
+                return;
+            }
+
+            drawWheel();
+            resultDiv.innerText = "準備就緒！";
+            resultDiv.style.color = "#333";
+        }
+
+        // 繪製輪盤
+        function drawWheel() {
+            const numOptions = options.length;
+            const arcSize = (2 * Math.PI) / numOptions;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = canvas.width / 2;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < numOptions; i++) {
+                const angle = i * arcSize - Math.PI / 2; // -90度開始畫，讓第一個在正上方
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, angle, angle + arcSize);
+                // 使用 (i % colors.length) 確保循環使用顏色
+                ctx.fillStyle = colors[i % colors.length]; 
+                ctx.fill();
+                ctx.stroke();
+
+                // 繪製文字
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(angle + arcSize / 2);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "#fff";
+                
+                // **文字大小動態調整**：選項越多，字體越小，避免重疊
+                ctx.font = `bold ${Math.max(16, 28 - numOptions)}px Arial`; 
+                
+                ctx.fillText(options[i], radius - 20, 10);
+                ctx.restore();
+            }
+        }
+
+        // 旋轉邏輯
+        function spinWheel() {
+            if (isSpinning) return;
+            if (options.length === 0) {
+                initWheel(); 
+                if(options.length === 0) return;
+            }
+
+            isSpinning = true;
+            resultDiv.innerText = "旋轉中...";
+            
+            // 計算旋轉角度：目前的角度 + 隨機圈數(5-10圈) + 隨機偏移
+            const randomSpins = Math.floor(Math.random() * 5) + 5; 
+            const randomDegree = Math.floor(Math.random() * 360);
+            const totalDegree = randomSpins * 360 + randomDegree;
+
+            // 累積旋轉角度
+            currentRotation += totalDegree;
+
+            // 應用 CSS 旋轉
+            canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+            // 監聽動畫結束
+            setTimeout(() => {
+                isSpinning = false;
+                calculateWinner(currentRotation);
+            }, 4000); 
+        }
+
+        // 計算贏家
+        function calculateWinner(rotation) {
+            const numOptions = options.length;
+            const arcSize = 360 / numOptions;
+            
+            // 實際在指針下的角度 (抵消掉順時針旋轉的角度)
+            const actualDeg = (360 - (rotation % 360)) % 360;
+            
+            const index = Math.floor(actualDeg / arcSize);
+            const winner = options[index];
+
+            resultDiv.innerText = `結果是：${winner}！`;
+            resultDiv.style.color = "#d63031";
+            
+            // 簡單的慶祝特效
+            canvas.style.transition = "none"; 
+            setTimeout(() => {
+                 canvas.style.transition = "transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)";
+            }, 50);
+        }
+
+        // 頁面載入時先畫一次
+        window.onload = initWheel;
+    </script>
+</body>
+</html>

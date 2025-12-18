@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五子棋 (人機對戰)</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", Arial, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        /* 棋盤容器 */
+        .game-container {
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        canvas {
+            background-color: #DEB887; /* 木頭色 */
+            cursor: pointer;
+            display: block;
+        }
+
+        /* 狀態列與按鈕 */
+        .status-bar {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .status {
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 10px 20px;
+            background: white;
+            border-radius: 50px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        button {
+            padding: 10px 25px;
+            font-size: 1rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        /* 勝利/失敗訊息 */
+        #message {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>五子棋 - 人機對戰</h1>
+    
+    <div class="game-container">
+        <!-- 棋盤大小 450x450 (15條線 x 30px間距) -->
+        <canvas id="board" width="450" height="450"></canvas>
+    </div>
+
+    <div class="status-bar">
+        <div class="status">當前回合: <span id="currentTurn" style="color: black;">黑子 (玩家)</span></div>
+        <button onclick="initGame()">重新開始</button>
+    </div>
+    <div id="message" style="margin-top: 15px; font-size: 1.5rem; height: 30px;"></div>
+
+    <script>
+        const canvas = document.getElementById('board');
+        const ctx = canvas.getContext('2d');
+        const turnDisplay = document.getElementById('currentTurn');
+        const msgDisplay = document.getElementById('message');
+
+        // 遊戲參數
+        const GRID_SIZE = 15; // 15x15 棋盤
+        const CELL_SIZE = 30; // 每一格的像素大小
+        const OFFSET = 15;    // 棋盤邊緣留白 (線條起始點)
+        
+        let board = [];       // 0: 空, 1: 黑(玩家), 2: 白(電腦)
+        let isGameOver = false;
+        let isPlayerTurn = true; // true: 玩家, false: 電腦
+
+        // 初始化遊戲
+        function initGame() {
+            // 建立 15x15 的二維陣列
+            board = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
+            isGameOver = false;
+            isPlayerTurn = true;
+            turnDisplay.innerText = "黑子 (玩家)";
+            turnDisplay.style.color = "black";
+            msgDisplay.innerText = "";
+            drawBoard();
+        }
+
+        // 繪製棋盤背景與格線
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.beginPath();
+            ctx.strokeStyle = "#555";
+            ctx.lineWidth = 1;
+
+            for (let i = 0; i < GRID_SIZE; i++) {
+                // 畫橫線
+                ctx.moveTo(OFFSET, OFFSET + i * CELL_SIZE);
+                ctx.lineTo(canvas.width - OFFSET, OFFSET + i * CELL_SIZE);
+                // 畫直線
+                ctx.moveTo(OFFSET + i * CELL_SIZE, OFFSET);
+                ctx.lineTo(OFFSET + i * CELL_SIZE, canvas.height - OFFSET);
+            }
+            ctx.stroke();
+
+            // 畫 5 個「星位」黑點 (裝飾用)
+            drawStarPoint(3, 3);
+            drawStarPoint(11, 3);
+            drawStarPoint(7, 7);
+            drawStarPoint(3, 11);
+            drawStarPoint(11, 11);
+
+            // 重繪所有棋子
+            for(let y=0; y<GRID_SIZE; y++){
+                for(let x=0; x<GRID_SIZE; x++){
+                    if(board[y][x] !== 0){
+                        drawPiece(x, y, board[y][x]);
+                    }
+                }
+            }
+        }
+
+        function drawStarPoint(x, y) {
+            ctx.beginPath();
+            ctx.arc(OFFSET + x * CELL_SIZE, OFFSET + y * CELL_SIZE, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = "black";
+            ctx.fill();
+        }
+
+        // 繪製棋子
+        function drawPiece(x, y, role) {
+            ctx.beginPath();
+            let cx = OFFSET + x * CELL_SIZE;
+            let cy = OFFSET + y * CELL_SIZE;
+            
+            ctx.arc(cx, cy, 13, 0, 2 * Math.PI);
+            
+            // 製作漸層讓棋子有立體感
+            let gradient = ctx.createRadialGradient(cx - 5, cy - 5, 1, cx, cy, 13);
+            if (role === 1) { // 黑子
+                gradient.addColorStop(0, "#666");
+                gradient.addColorStop(1, "#000");
+            } else { // 白子
+                gradient.addColorStop(0, "#fff");
+                gradient.addColorStop(1, "#ddd");
+                ctx.shadowBlur = 2;
+                ctx.shadowColor = "rgba(0,0,0,0.5)";
+            }
+            
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            ctx.shadowBlur = 0; // 重置陰影
+        }
+
+        // 玩家點擊事件
+        canvas.addEventListener('click', (e) => {
+            if (isGameOver || !isPlayerTurn) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            // 計算最近的交叉點索引
+            // 減去 OFFSET 是為了校正邊界，除以 CELL_SIZE 取得格數
+            let x = Math.round((clickX - OFFSET) / CELL_SIZE);
+            let y = Math.round((clickY - OFFSET) / CELL_SIZE);
+
+            // 檢查邊界與該位置是否為空
+            if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE && board[y][x] === 0) {
+                placePiece(x, y, 1); // 1 代表玩家(黑)
+            }
+        });
+
+        // 下子邏輯
+        function placePiece(x, y, role) {
+            board[y][x] = role;
+            drawPiece(x, y, role);
+
+            // 檢查勝利
+            if (checkWin(x, y, role)) {
+                isGameOver = true;
+                msgDisplay.innerText = role === 1 ? "恭喜你贏了！" : "電腦獲勝，再接再厲！";
+                return;
+            }
+
+            // 換手
+            isPlayerTurn = !isPlayerTurn;
+            if (isPlayerTurn) {
+                turnDisplay.innerText = "黑子 (玩家)";
+                turnDisplay.style.color = "black";
+            } else {
+                turnDisplay.innerText = "白子 (電腦思考中...)";
+                turnDisplay.style.color = "#888";
+                
+                // 延遲一下模擬思考，體驗較好
+                setTimeout(computerMove, 500); 
+            }
+        }
+
+        // 勝利判定 (檢查四個方向)
+        function checkWin(x, y, role) {
+            const directions = [
+                [1, 0],  // 水平
+                [0, 1],  // 垂直
+                [1, 1],  // 右下斜
+                [1, -1]  // 左下斜
+            ];
+
+            for (let [dx, dy] of directions) {
+                let count = 1;
+                
+                // 向正方向檢查
+                let i = 1;
+                while (true) {
+                    let nx = x + dx * i;
+                    let ny = y + dy * i;
+                    if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE || board[ny][nx] !== role) break;
+                    count++;
+                    i++;
+                }
+
+                // 向反方向檢查
+                i = 1;
+                while (true) {
+                    let nx = x - dx * i;
+                    let ny = y - dy * i;
+                    if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE || board[ny][nx] !== role) break;
+                    count++;
+                    i++;
+                }
+
+                if (count >= 5) return true;
+            }
+            return false;
+        }
+
+        // --- 電腦 AI 核心邏輯 (貪婪演算法 + 權重評估) ---
+        function computerMove() {
+            if (isGameOver) return;
+
+            let bestScore = -Infinity;
+            let bestMoves = [];
+
+            // 掃描棋盤上每一個空位
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    if (board[y][x] === 0) {
+                        // 評估這一步的分數
+                        // 電腦是 2 (白子), 玩家是 1 (黑子)
+                        // 我們要最大化電腦的攻擊分，並加上阻擋玩家的防守分
+                        let attackScore = evaluatePoint(x, y, 2); 
+                        let defenseScore = evaluatePoint(x, y, 1);
+                        
+                        // 權重：防守稍微重要一點，但如果能贏(攻擊分極高)則優先攻擊
+                        // 這裡使用簡單的加總，通常防守權重可以設高一點避免被偷襲
+                        let score = attackScore + defenseScore;
+
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMoves = [{x, y}];
+                        } else if (score === bestScore) {
+                            bestMoves.push({x, y});
+                        }
+                    }
+                }
+            }
+
+            // 如果有同樣高分的位置，隨機選一個
+            if (bestMoves.length > 0) {
+                const move = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+                placePiece(move.x, move.y, 2);
+            }
+        }
+
+        // 評估某個點對於某個角色(role)的分數
+        function evaluatePoint(x, y, role) {
+            let totalScore = 0;
+            const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+
+            for (let [dx, dy] of directions) {
+                let count = 1; // 連子數
+                let emptyEnds = 0; // 兩端是否為空
+
+                // 檢查正方向
+                let i = 1;
+                while (true) {
+                    let nx = x + dx * i;
+                    let ny = y + dy * i;
+                    if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) break; // 邊界
+                    if (board[ny][nx] === role) {
+                        count++;
+                    } else if (board[ny][nx] === 0) {
+                        emptyEnds++;
+                        break;
+                    } else {
+                        break; // 遇到對手棋子
+                    }
+                    i++;
+                }
+
+                // 檢查反方向
+                i = 1;
+                while (true) {
+                    let nx = x - dx * i;
+                    let ny = y - dy * i;
+                    if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) break;
+                    if (board[ny][nx] === role) {
+                        count++;
+                    } else if (board[ny][nx] === 0) {
+                        emptyEnds++;
+                        break;
+                    } else {
+                        break;
+                    }
+                    i++;
+                }
+
+                // 給分規則 (數值越大代表越重要)
+                if (count >= 5) totalScore += 100000; // 成五 (必勝/必擋)
+                else if (count === 4 && emptyEnds === 2) totalScore += 10000; // 活四
+                else if (count === 4 && emptyEnds === 1) totalScore += 1000;  // 衝四
+                else if (count === 3 && emptyEnds === 2) totalScore += 500;   // 活三
+                else if (count === 3 && emptyEnds === 1) totalScore += 100;   // 眠三
+                else if (count === 2 && emptyEnds === 2) totalScore += 50;    // 活二
+            }
+            return totalScore;
+        }
+
+        // 啟動遊戲
+        initGame();
+
+    </script>
+</body>
+</html>
