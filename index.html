@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>經典遊戲大廳 | Retro Game Hub</title>
+    <style>
+        :root {
+            --primary: #6e8efb;
+            --secondary: #a777e3;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: white;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            padding: 60px 20px 40px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #00d2ff, #92fe9d, #6e8efb, #a777e3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            filter: drop-shadow(0 5px 15px rgba(110, 142, 251, 0.3));
+        }
+
+        header p {
+            color: #94a3b8;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+        }
+
+        .container {
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            padding: 40px 20px;
+            width: 90%;
+        }
+
+        .game-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 24px;
+            padding: 30px;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.05));
+            pointer-events: none;
+        }
+
+        .game-card:hover {
+            transform: translateY(-12px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            border-color: rgba(110, 142, 251, 0.5);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .game-icon {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));
+        }
+
+        .game-card h2 {
+            margin: 10px 0;
+            font-size: 1.5rem;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .game-card p {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: #cbd5e1;
+            margin-bottom: 25px;
+            height: 4.5em; /* 保持描述文字高度一致 */
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .play-btn {
+            background: linear-gradient(135deg, #6e8efb 0%, #a777e3 100%);
+            color: white;
+            text-decoration: none;
+            padding: 14px 20px;
+            border-radius: 14px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(110, 142, 251, 0.3);
+        }
+
+        .play-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 20px rgba(167, 119, 227, 0.5);
+            filter: brightness(1.1);
+        }
+
+        footer {
+            margin-top: auto;
+            padding: 50px;
+            color: #64748b;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        /* 針對不同遊戲卡片的微調裝飾（選填） */
+        .card-sudoku { border-left: 4px solid #f6d365; }
+        .card-pacman { border-left: 4px solid #ff9a9e; }
+        .card-snake { border-left: 4px solid #8fd3f4; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>經典遊戲大廳</h1>
+        <p>— 霓虹、玻璃、與純粹的遊戲靈魂 —</p>
+    </header>
+
+    <div class="container">
+        <div class="game-card card-pacman">
+            <div>
+                <div class="game-icon">🍕</div>
+                <h2>小精靈 (Pac-Man)</h2>
+                <p>在迷宮中閃避幽靈，收集所有閃亮的豆子。這是對專注力與走位極限的復古挑戰。</p>
+            </div>
+            <a href="#" class="play-btn">啟動遊戲</a>
+        </div>
+
+        <div class="game-card card-sudoku">
+            <div>
+                <div class="game-icon">🔢</div>
+                <h2>數獨 (Sudoku)</h2>
+                <p>邏輯與數字的終極考驗！在 9x9 的方格中填入正確數字，解開精妙設計的數字迷陣。</p>
+            </div>
+            <a href="#" class="play-btn">鍛鍊大腦</a>
+        </div>
+
+        <div class="game-card card-snake">
+            <div>
+                <div class="game-icon">🐍</div>
+                <h2>貪食蛇 (Snake)</h2>
+                <p>不斷進食以獲得成長，但請務必小心——你的身體是你最大的敵人，千萬別撞上它。</p>
+            </div>
+            <a href="#" class="play-btn">啟動遊戲</a>
+        </div>
+
+        <div class="game-card">
+            <div>
+                <div class="game-icon">🧱</div>
+                <h2>經典打磚塊</h2>
+                <p>掌握物理反彈的節奏，摧毀每一塊障礙。考驗你的反應速度與精準的操作技巧。</p>
+            </div>
+            <a href="#" class="play-btn">啟動遊戲</a>
+        </div>
+
+        <div class="game-card">
+            <div>
+                <div class="game-icon">🎡</div>
+                <h2>幸運輪盤</h2>
+                <p>讓隨機性帶來驚喜！轉動繽紛的輪盤，看看今天的運氣會帶領你走向什麼樣的終點。</p>
+            </div>
+            <a href="#" class="play-btn">試試手氣</a>
+        </div>
+
+        <div class="game-card">
+            <div>
+                <div class="game-icon">⚪</div>
+                <h2>五子棋 (Gomoku)</h2>
+                <p>黑白棋子間的無聲博弈。在縱橫交錯的棋盤上，爭奪先機，連結出致勝的五連星。</p>
+            </div>
+            <a href="#" class="play-btn">進入對局</a>
+        </div>
+    </div>
+
+    <footer>
+        &copy; 2025 經典遊戲收藏館 <br>
+        <small>Designed for Retro Gaming Enthusiasts</small>
+    </footer>
+
+</body>
+</html>
