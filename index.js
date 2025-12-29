@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
  * 只允許你的 GitHub Pages
  */
 app.use(cors({
-  origin: ["http://127.0.0.1:5500", "http://localhost:5500", "https://stevencjkuo.github.io/my-english-app/"]
+  origin: ["http://127.0.0.1:5500", "http://localhost:5500", "https://stevencjkuo.github.io/my-game/"]
 }));
 
 app.use(express.json());
@@ -56,3 +56,4 @@ app.post("/api/gemini", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Gemini relay listening on port ${PORT}`);
 });
+
