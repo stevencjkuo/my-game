@@ -9,9 +9,20 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 允許你的前端來源
+
 app.use(cors({
-  origin: ["http://127.0.0.1:5173", "http://localhost:5173", "https://stevencjkuo.github.io", /\.vercel\.app$/]
+  origin: [
+    "http://127.0.0.1:5173", 
+    "http://localhost:5173", 
+    "https://eng-vantage.vercel.app", // 這是你截圖中顯示的來源網域
+    /\.vercel\.app$/                  // 允許所有 Vercel 的預覽網域
+  ],
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"]
 }));
+
+
+
 app.use(express.json());
 
 // 初始化 Gemini
