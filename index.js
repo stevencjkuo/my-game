@@ -8,14 +8,12 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 允許你的前端來源
-
 app.use(cors({
   origin: [
     "http://127.0.0.1:5173", 
     "http://localhost:5173", 
-    "https://eng-vantage.vercel.app", // 這是你截圖中顯示的來源網域
-    /\.vercel\.app$/                  // 允許所有 Vercel 的預覽網域
+    "https://eng-vantage.vercel.app",
+    /\.vercel\.app$/
   ],
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type"]
@@ -25,10 +23,8 @@ app.use(cors({
 
 app.use(express.json());
 
-// 初始化 Gemini
 const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
 
-// 定義 Schema (原本在前端 geminiService 裡的那些)
 const WORD_SCHEMA = {
   type: SchemaType.OBJECT,
   properties: {
@@ -61,7 +57,6 @@ const WORD_SCHEMA = {
   required: ["term", "definition", "translations", "examples"]
 };
 
-// 路由 1: 單個單字查詢 (對應前端 fetchWordDetails)
 app.post("/api/fetch-word", async (req, res) => {
   try {
     const { term, difficulty, targetLang } = req.body;
@@ -78,7 +73,6 @@ app.post("/api/fetch-word", async (req, res) => {
   }
 });
 
-// 路由 2: 批量生成單字 (對應前端 generateBatchWords)
 app.post("/api/generate-batch", async (req, res) => {
   try {
     const { difficulty, targetLang, existingWords } = req.body;
@@ -99,3 +93,4 @@ app.post("/api/generate-batch", async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Render Server running on port ${PORT}`));
+
