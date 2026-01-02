@@ -1,61 +1,27 @@
-import express from "express";
-import axios from "axios";
-import cors from "cors";
-import dotenv from "dotenv";
-
-dotenv.config();
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
+require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-/**
- * 只允許你的 GitHub Pages
- */
-app.use(cors({
-  origin: ["http://127.0.0.1:5500", "http://localhost:5500", "https://stevencjkuo.github.io/EngVantage/"]
-}));
-
+app.use(cors()); // 允許跨網域請求
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("Gemini Relay Server is running 🚀");
+// 這是一個代理路由
+app.get('/api/data', async (req, res) => {
+    try {
+        // 從環境變數讀取金鑰，金鑰不會傳給前端
+        const API_KEY = process.env.MY_SECRET_KEY; 
+        
+        // 呼叫真正的第三方 API
+        const response = await axios.get(`https://api.external-service.com/v1/data?key=${API_KEY}`);
+        
+        // 只回傳資料給前端
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: '伺服器錯誤' });
+    }
 });
 
-/**
- * Gemini 中繼 API
- */
-app.post("/api/gemini", async (req, res) => {
-  try {
-    const { prompt } = req.body;
-    if (!prompt) return res.status(400).json({ error: "Prompt is required" });
-
-    // 確保 URL 格式完全正確
-    const apiUrl = `${process.env.GEMINI_API_URL}?key=${process.env.GEMINI_API_KEY}`;
-
-    const response = await axios.post(apiUrl, 
-      {
-        contents: [{ parts: [{ text: prompt }] }]
-      },
-      {
-        headers: { "Content-Type": "application/json" }
-      }
-    );
-
-    res.json(response.data);
-
-  } catch (err) {
-    // 輸出詳細錯誤到控制台方便排查
-    console.error("Gemini Error:", err.response?.data || err.message);
-    res.status(500).json({
-      error: "Gemini relay failed",
-      message: err.response?.data || err.message
-    });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`Gemini relay listening on port ${PORT}`);
-});
-
-
-
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`伺服器運行於埠號 ${PORT}`));
