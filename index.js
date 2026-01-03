@@ -1,10 +1,11 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai"; // 修正這行
 
 dotenv.config();
 
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY); // 加上這行初始化
 const app = express();
 const PORT = process.env.PORT || 3000;
 
