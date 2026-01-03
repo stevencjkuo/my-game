@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { GoogleGenAI, SchemaType } from "@google/genai";
+import { GoogleGenerativeAI, SchemaType } from "@google/genai";
 
 dotenv.config();
 
@@ -99,3 +99,4 @@ app.post("/api/generate-batch", async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Render Server running on port ${PORT}`));
+
