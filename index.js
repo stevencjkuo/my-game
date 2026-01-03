@@ -26,7 +26,7 @@ app.use(cors({
 app.use(express.json());
 
 // 初始化 Gemini
-const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // 定義 Schema (原本在前端 geminiService 裡的那些)
 const WORD_SCHEMA = {
@@ -99,4 +99,5 @@ app.post("/api/generate-batch", async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Render Server running on port ${PORT}`));
+
 
