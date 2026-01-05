@@ -22,6 +22,10 @@ app.use(cors({
 
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.send("Render Gemini Relay is running");
+});
+
 // 初始化 Gemini SDK (金鑰從環境變數讀取)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -101,3 +105,4 @@ app.post("/api/generate-batch", async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Render Server running on port ${PORT}`));
+
