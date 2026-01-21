@@ -71,7 +71,7 @@ app.post("/api/fetch-word", async (req, res) => {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
       generationConfig: { responseMimeType: "application/json", responseSchema: WORD_SCHEMA }
-    });
+    },{ apiVersion: "v1" });
 
     const prompt = `Provide linguistic analysis for the English word "${term}". Level: ${difficulty}. Target language: ${targetLang.name}.`;
     const result = await model.generateContent(prompt);
@@ -93,7 +93,7 @@ app.post("/api/generate-batch", async (req, res) => {
         responseSchema: { type: "array", items: WORD_SCHEMA } 
 
       }
-    });
+    },{apiVersion: "v1" });
 
     const prompt = `Synthesize 10 useful English words for a learner. Level: ${difficulty}. Target language: ${targetLang.name}. Avoid these words: ${existingWords?.join(', ') || 'none'}.`;
     const result = await model.generateContent(prompt);
@@ -102,8 +102,7 @@ app.post("/api/generate-batch", async (req, res) => {
     console.error("Batch Generate Error:", error);
     res.status(500).json({ error: error.message });
   }
-});
+}); 
 
 app.listen(PORT, () => console.log(`🚀 Render Server running on port ${PORT}`));
-
 
