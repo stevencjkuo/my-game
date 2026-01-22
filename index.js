@@ -8,7 +8,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 設定 CORS 白名單，允許 Vercel 與在地端測試
+// 設定 CORS 白名單
 app.use(cors({
   origin: [
     "http://127.0.0.1:5173", 
@@ -26,10 +26,37 @@ app.get("/", (req, res) => {
   res.send("Render Gemini Relay is running");
 });
 
-// 初始化 Gemini SDK (金鑰從環境變數讀取)
+// 初始化 Gemini SDK
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// 修正後的 WORD_SCHEMA 定義
+// 延遲工具函式
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * 核心重試邏輯：處理 429 頻率限制錯誤
+ */
+async function generateContentWithRetry(model, prompt, maxRetries = 3) {
+  let retries = 0;
+  while (retries < maxRetries) {
+    try {
+      const result = await model.generateContent(prompt);
+      return result;
+    } catch (error) {
+      // 檢查是否為 429 錯誤
+      if (error.status === 429 || (error.message && error.message.includes("429"))) {
+        retries++;
+        // 指數退避：分別等待約 4s, 8s, 16s
+        const waitTime = Math.pow(2, retries + 1) * 1000 + Math.random() * 1000;
+        console.warn(`[Quota] 觸發頻率限制，嘗試第 ${retries} 次重試，等待 ${Math.round(waitTime/1000)} 秒...`);
+        await delay(waitTime);
+      } else {
+        throw error; // 其他錯誤直接拋出
+      }
+    }
+  }
+  throw new Error("超過最大重試次數，請稍後再試或檢查 API 額度。");
+}
+
 const WORD_SCHEMA = {
   type: "object",
   properties: {
@@ -74,11 +101,13 @@ app.post("/api/fetch-word", async (req, res) => {
     });
 
     const prompt = `Provide linguistic analysis for the English word "${term}". Level: ${difficulty}. Target language: ${targetLang.name}.`;
-    const result = await model.generateContent(prompt);
+    
+    // 使用重試機制呼叫
+    const result = await generateContentWithRetry(model, prompt);
     res.json(JSON.parse(result.response.text()));
   } catch (error) {
     console.error("Fetch Word Error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(error.status || 500).json({ error: error.message });
   }
 });
 
@@ -91,21 +120,18 @@ app.post("/api/generate-batch", async (req, res) => {
       generationConfig: { 
         responseMimeType: "application/json", 
         responseSchema: { type: "array", items: WORD_SCHEMA } 
-
       }
     });
 
     const prompt = `Synthesize 10 useful English words for a learner. Level: ${difficulty}. Target language: ${targetLang.name}. Avoid these words: ${existingWords?.join(', ') || 'none'}.`;
-    const result = await model.generateContent(prompt);
+    
+    // 使用重試機制呼叫
+    const result = await generateContentWithRetry(model, prompt);
     res.json(JSON.parse(result.response.text()));
   } catch (error) {
     console.error("Batch Generate Error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(error.status || 500).json({ error: error.message });
   }
 }); 
 
 app.listen(PORT, () => console.log(`🚀 Render Server running on port ${PORT}`));
-
-
-
-
