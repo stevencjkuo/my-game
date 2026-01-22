@@ -69,7 +69,7 @@ app.post("/api/fetch-word", async (req, res) => {
   try {
     const { term, difficulty, targetLang } = req.body;
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+      model: "models/gemini-2.0-flash",
       generationConfig: { responseMimeType: "application/json", responseSchema: WORD_SCHEMA }
     });
 
@@ -87,7 +87,7 @@ app.post("/api/generate-batch", async (req, res) => {
   try {
     const { difficulty, targetLang, existingWords } = req.body;
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+      model: "models/gemini-2.0-flash",
       generationConfig: { 
         responseMimeType: "application/json", 
         responseSchema: { type: "array", items: WORD_SCHEMA } 
@@ -105,6 +105,7 @@ app.post("/api/generate-batch", async (req, res) => {
 }); 
 
 app.listen(PORT, () => console.log(`🚀 Render Server running on port ${PORT}`));
+
 
 
 
