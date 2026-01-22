@@ -6,9 +6,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 dotenv.config();
 
 const app = express();
+// Render 部署建議優先使用 process.env.PORT，預設通常是 10000
 const PORT = process.env.PORT || 3000;
 
-// 設定 CORS 白名單
 app.use(cors({
   origin: [
     "http://127.0.0.1:5173", 
@@ -26,16 +26,15 @@ app.get("/", (req, res) => {
   res.send("Render Gemini Relay is running");
 });
 
-// 初始化 Gemini SDK
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // 延遲工具函式
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * 核心重試邏輯：處理 429 頻率限制錯誤
+ * 進階重試邏輯：針對 2026 免費版限制優化
  */
-async function generateContentWithRetry(model, prompt, maxRetries = 3) {
+async function generateContentWithRetry(model, prompt, maxRetries = 5) { // 增加至 5 次
   let retries = 0;
   while (retries < maxRetries) {
     try {
@@ -45,16 +44,20 @@ async function generateContentWithRetry(model, prompt, maxRetries = 3) {
       // 檢查是否為 429 錯誤
       if (error.status === 429 || (error.message && error.message.includes("429"))) {
         retries++;
-        // 指數退避：分別等待約 4s, 8s, 16s
-        const waitTime = Math.pow(2, retries + 1) * 1000 + Math.random() * 1000;
-        console.warn(`[Quota] 觸發頻率限制，嘗試第 ${retries} 次重試，等待 ${Math.round(waitTime/1000)} 秒...`);
+        
+        // 增加初始等待時間：第 1 次失敗等 10s，之後指數級增長 (10s, 20s, 40s...)
+        // 加入 Math.random() 避免多個請求同時重試
+        const waitTime = Math.pow(2, retries - 1) * 10000 + (Math.random() * 3000);
+        
+        console.warn(`[Quota] 偵測到頻率限制，嘗試第 ${retries}/${maxRetries} 次重試，等待 ${Math.round(waitTime/1000)} 秒...`);
+        
         await delay(waitTime);
       } else {
-        throw error; // 其他錯誤直接拋出
+        throw error; 
       }
     }
   }
-  throw new Error("超過最大重試次數，請稍後再試或檢查 API 額度。");
+  throw new Error("已達到最大重試次數。如果您使用的是免費版，可能已達每日 100 次的請求上限。");
 }
 
 const WORD_SCHEMA = {
@@ -102,7 +105,6 @@ app.post("/api/fetch-word", async (req, res) => {
 
     const prompt = `Provide linguistic analysis for the English word "${term}". Level: ${difficulty}. Target language: ${targetLang.name}.`;
     
-    // 使用重試機制呼叫
     const result = await generateContentWithRetry(model, prompt);
     res.json(JSON.parse(result.response.text()));
   } catch (error) {
@@ -115,6 +117,10 @@ app.post("/api/fetch-word", async (req, res) => {
 app.post("/api/generate-batch", async (req, res) => {
   try {
     const { difficulty, targetLang, existingWords } = req.body;
+    
+    // 批次生成前強制冷卻 3 秒，避免短時間內發送過多請求
+    await delay(3000);
+
     const model = genAI.getGenerativeModel({ 
       model: "models/gemini-2.0-flash",
       generationConfig: { 
@@ -125,7 +131,6 @@ app.post("/api/generate-batch", async (req, res) => {
 
     const prompt = `Synthesize 10 useful English words for a learner. Level: ${difficulty}. Target language: ${targetLang.name}. Avoid these words: ${existingWords?.join(', ') || 'none'}.`;
     
-    // 使用重試機制呼叫
     const result = await generateContentWithRetry(model, prompt);
     res.json(JSON.parse(result.response.text()));
   } catch (error) {
