@@ -109,7 +109,7 @@ app.post("/api/fetch-word", async (req, res) => {
   try {
     const { term, difficulty, targetLang } = req.body;
     const model = genAI.getGenerativeModel({ 
-      model: "models/gemini-1.5-flash",
+      model: "models/gemini-1.5-flash-latest",
       generationConfig: { responseMimeType: "application/json", responseSchema: WORD_SCHEMA }
     });
 
@@ -129,7 +129,7 @@ app.post("/api/generate-batch", async (req, res) => {
     const { difficulty, targetLang, existingWords } = req.body;
     
     const model = genAI.getGenerativeModel({ 
-      model: "models/gemini-1.5-flash",
+      model: "models/gemini-1.5-flash-latest",
       generationConfig: { 
         responseMimeType: "application/json", 
         responseSchema: { type: "array", items: WORD_SCHEMA } 
@@ -137,7 +137,7 @@ app.post("/api/generate-batch", async (req, res) => {
     });
 
     // 建議將 10 改為 8，降低單次生成的 Token 數與處理時間
-    const prompt = `Synthesize 8 useful English words for a learner. Level: ${difficulty}. Target language: ${targetLang.name}. Avoid: ${existingWords?.slice(-20).join(', ') || 'none'}.`;
+    const prompt = `Synthesize 2 useful English words for a learner. Level: ${difficulty}. Target language: ${targetLang.name}. Avoid: ${existingWords?.slice(-20).join(', ') || 'none'}.`;
     
     const result = await generateContentWithRetry(model, prompt);
     res.json(JSON.parse(result.response.text()));
@@ -152,4 +152,5 @@ app.get("/", (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Render Server running on port ${PORT}`));
+
 
