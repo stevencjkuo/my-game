@@ -6,8 +6,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 dotenv.config();
 
 const app = express();
-// Render 部署建議優先使用 process.env.PORT，預設通常是 10000
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000; // Render 優先使用 10000
 
 app.use(cors({
   origin: [
@@ -22,42 +21,53 @@ app.use(cors({
 
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("Render Gemini Relay is running");
-});
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// 全域請求時間追蹤，用於防止併發請求過快
+let lastRequestTime = Date.now();
 
 // 延遲工具函式
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
 /**
- * 進階重試邏輯：針對 2026 免費版限制優化
+ * 優化後的重試與流量控制邏輯
  */
-async function generateContentWithRetry(model, prompt, maxRetries = 5) { // 增加至 5 次
+async function generateContentWithRetry(model, prompt, maxRetries = 3) {
   let retries = 0;
-  while (retries < maxRetries) {
+  
+  while (retries <= maxRetries) {
     try {
+      // 1. 強制冷卻機制：確保兩次請求之間至少間隔 4 秒
+      const now = Date.now();
+      const minInterval = 4000; 
+      const timeSinceLast = now - lastRequestTime;
+      if (timeSinceLast < minInterval) {
+        await delay(minInterval - timeSinceLast);
+      }
+
       const result = await model.generateContent(prompt);
+      
+      // 成功後更新最後請求時間
+      lastRequestTime = Date.now();
       return result;
+
     } catch (error) {
-      // 檢查是否為 429 錯誤
-      if (error.status === 429 || (error.message && error.message.includes("429"))) {
+      const isRateLimit = error.status === 429 || (error.message && error.message.includes("429"));
+      
+      if (isRateLimit && retries < maxRetries) {
         retries++;
+        // 指數級等待：12s, 24s, 48s (稍微縮短以防 Render 超時)
+        const waitTime = Math.pow(2, retries) * 6000 + (Math.random() * 2000);
         
-        // 增加初始等待時間：第 1 次失敗等 10s，之後指數級增長 (10s, 20s, 40s...)
-        // 加入 Math.random() 避免多個請求同時重試
-        const waitTime = Math.pow(2, retries - 1) * 10000 + (Math.random() * 3000);
-        
-        console.warn(`[Quota] 偵測到頻率限制，嘗試第 ${retries}/${maxRetries} 次重試，等待 ${Math.round(waitTime/1000)} 秒...`);
-        
+        console.warn(`[Quota] 偵測到限制，重試 ${retries}/${maxRetries}，等待 ${Math.round(waitTime/1000)} 秒...`);
         await delay(waitTime);
       } else {
-        throw error; 
+        // 非 429 錯誤或已達重試上限則拋出
+        throw error;
       }
     }
   }
-  throw new Error("已達到最大重試次數。如果您使用的是免費版，可能已達每日 100 次的請求上限。");
+  throw new Error("API 請求次數過多。如果您使用的是免費版，請稍後再試或減少批次數量。");
 }
 
 const WORD_SCHEMA = {
@@ -108,7 +118,7 @@ app.post("/api/fetch-word", async (req, res) => {
     const result = await generateContentWithRetry(model, prompt);
     res.json(JSON.parse(result.response.text()));
   } catch (error) {
-    console.error("Fetch Word Error:", error);
+    console.error("Fetch Word Error:", error.message);
     res.status(error.status || 500).json({ error: error.message });
   }
 });
@@ -118,9 +128,6 @@ app.post("/api/generate-batch", async (req, res) => {
   try {
     const { difficulty, targetLang, existingWords } = req.body;
     
-    // 批次生成前強制冷卻 3 秒，避免短時間內發送過多請求
-    await delay(3000);
-
     const model = genAI.getGenerativeModel({ 
       model: "models/gemini-2.0-flash",
       generationConfig: { 
@@ -129,14 +136,19 @@ app.post("/api/generate-batch", async (req, res) => {
       }
     });
 
-    const prompt = `Synthesize 10 useful English words for a learner. Level: ${difficulty}. Target language: ${targetLang.name}. Avoid these words: ${existingWords?.join(', ') || 'none'}.`;
+    // 建議將 10 改為 8，降低單次生成的 Token 數與處理時間
+    const prompt = `Synthesize 8 useful English words for a learner. Level: ${difficulty}. Target language: ${targetLang.name}. Avoid: ${existingWords?.slice(-20).join(', ') || 'none'}.`;
     
     const result = await generateContentWithRetry(model, prompt);
     res.json(JSON.parse(result.response.text()));
   } catch (error) {
-    console.error("Batch Generate Error:", error);
+    console.error("Batch Generate Error:", error.message);
     res.status(error.status || 500).json({ error: error.message });
   }
-}); 
+});
+
+app.get("/", (req, res) => {
+  res.send("Render Gemini Relay is running");
+});
 
 app.listen(PORT, () => console.log(`🚀 Render Server running on port ${PORT}`));
