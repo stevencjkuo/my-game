@@ -108,14 +108,20 @@ const WORD_SCHEMA = {
 app.post("/api/fetch-word", async (req, res) => {
   try {
     const { term, difficulty, targetLang } = req.body;
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      generationConfig: { responseMimeType: "application/json", responseSchema: WORD_SCHEMA }
-    });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }, 
+      { apiVersion: "v1beta" }
+    );
 
     const prompt = `Provide linguistic analysis for the English word "${term}". Level: ${difficulty}. Target language: ${targetLang.name}.`;
     
-    const result = await generateContentWithRetry(model, prompt);
+    // 修正：將 generationConfig 直接傳入 generateContent
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { 
+        responseMimeType: "application/json", 
+        responseSchema: WORD_SCHEMA 
+      }
+    });
     res.json(JSON.parse(result.response.text()));
   } catch (error) {
     console.error("Fetch Word Error:", error.message);
@@ -152,6 +158,7 @@ app.get("/", (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Render Server running on port ${PORT}`));
+
 
 
 
