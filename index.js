@@ -27,17 +27,19 @@ let lastRequestTime = Date.now();
 // 延遲工具函式
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// 初始化 SDK
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 /**
  * 優化後的重試與流量控制邏輯
+ * 修改：支援傳入整包 requestPayload (包含 contents 與 generationConfig)
  */
-async function generateContentWithRetry(model, prompt, maxRetries = 3) {
+async function generateContentWithRetry(model, requestPayload, maxRetries = 3) {
   let retries = 0;
   
   while (retries <= maxRetries) {
     try {
-      // 1. 強制冷卻機制：確保兩次請求之間至少間隔 4 秒
+      // 強制冷卻機制：確保兩次請求之間至少間隔 4 秒
       const now = Date.now();
       const minInterval = 4000; 
       const timeSinceLast = now - lastRequestTime;
@@ -45,9 +47,9 @@ async function generateContentWithRetry(model, prompt, maxRetries = 3) {
         await delay(minInterval - timeSinceLast);
       }
 
-      const result = await model.generateContent(prompt);
+      // 執行生成
+      const result = await model.generateContent(requestPayload);
       
-      // 成功後更新最後請求時間
       lastRequestTime = Date.now();
       return result;
 
@@ -56,18 +58,15 @@ async function generateContentWithRetry(model, prompt, maxRetries = 3) {
       
       if (isRateLimit && retries < maxRetries) {
         retries++;
-        // 指數級等待：12s, 24s, 48s (稍微縮短以防 Render 超時)
         const waitTime = Math.pow(2, retries) * 6000 + (Math.random() * 2000);
-        
         console.warn(`[Quota] 偵測到限制，重試 ${retries}/${maxRetries}，等待 ${Math.round(waitTime/1000)} 秒...`);
         await delay(waitTime);
       } else {
-        // 非 429 錯誤或已達重試上限則拋出
         throw error;
       }
     }
   }
-  throw new Error("API 請求次數過多。如果您使用的是免費版，請稍後再試或減少批次數量。");
+  throw new Error("API 請求次數過多，請稍後再試。");
 }
 
 const WORD_SCHEMA = {
@@ -108,13 +107,15 @@ const WORD_SCHEMA = {
 app.post("/api/fetch-word", async (req, res) => {
   try {
     const { term, difficulty, targetLang } = req.body;
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }, 
+    
+    // 強制指定 v1beta 與 gemini-1.5-flash
+    const model = genAI.getGenerativeModel(
+      { model: "gemini-1.5-flash" }, 
       { apiVersion: "v1beta" }
     );
 
     const prompt = `Provide linguistic analysis for the English word "${term}". Level: ${difficulty}. Target language: ${targetLang.name}.`;
     
-    // 修正：將 generationConfig 直接傳入 generateContent
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { 
@@ -122,6 +123,7 @@ app.post("/api/fetch-word", async (req, res) => {
         responseSchema: WORD_SCHEMA 
       }
     });
+
     res.json(JSON.parse(result.response.text()));
   } catch (error) {
     console.error("Fetch Word Error:", error.message);
@@ -134,18 +136,23 @@ app.post("/api/generate-batch", async (req, res) => {
   try {
     const { difficulty, targetLang, existingWords } = req.body;
     
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+    // 強制指定 v1beta 與 gemini-1.5-flash
+    const model = genAI.getGenerativeModel(
+      { model: "gemini-1.5-flash" }, 
+      { apiVersion: "v1beta" }
+    );
+
+    const prompt = `Synthesize 10 useful English words for a learner. Level: ${difficulty}. Target language: ${targetLang.name}. Avoid: ${existingWords?.slice(-20).join(', ') || 'none'}.`;
+    
+    // 使用重試機制，並傳入正確的 Config
+    const result = await generateContentWithRetry(model, {
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { 
         responseMimeType: "application/json", 
         responseSchema: { type: "array", items: WORD_SCHEMA } 
       }
     });
 
-    // 建議將 10 改為 8，降低單次生成的 Token 數與處理時間
-    const prompt = `Synthesize 2 useful English words for a learner. Level: ${difficulty}. Target language: ${targetLang.name}. Avoid: ${existingWords?.slice(-20).join(', ') || 'none'}.`;
-    
-    const result = await generateContentWithRetry(model, prompt);
     res.json(JSON.parse(result.response.text()));
   } catch (error) {
     console.error("Batch Generate Error:", error.message);
@@ -158,9 +165,3 @@ app.get("/", (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Render Server running on port ${PORT}`));
-
-
-
-
-
-
